@@ -8,10 +8,12 @@
 #  for remote workstations. I began cross-comparing return values of Get-MgDevice and came across the "IsManaged" property. This method can be adapted to not only cycle through Active Directory, but rather check status on EVERY 
 #  workstation returned by Get-MgDevice regardless of which tenant/agency it is part of.
 
+# Default amount of days to go back is a week this is changeable by running the script as such: .\Hybrid_Joined_Check.ps1 -DaysBack 50 (or any number of days you wish to go back)
 param(
     [int]$DaysBack = 7
 )
 
+# Class for our report
 class hybridReport
 {
     [string]$Workstation
@@ -19,12 +21,14 @@ class hybridReport
     [string]$HybridStatus
 }
 
+# User-defined variables for e-mailing the report
 $emailAddressToSendReportTo = "<CHANGE_TO_EMAIL_ADDRESS>" # Example: Benjamin.Barshaw@ode.oregon.gov
 $emailAddressToSendReportFrom = "<CHANGE_TO_SENDER>" # Example: ODE Hybrid-Joined Report <no-reply@ode.oregon.gov>
 $dateForEmail = Get-Date -Format MM/dd/yyyy # Doesn't need touching
 $emailSubject = "<CHANGE_TO_SUBJECT>" # Example: ODE Hybrid-Joined Report - $($dateForEmail)
 $smtpServerForEmail = "<CHANGE_TO_MAILSERVER>" # Example: smtp.agencyname.oregon.gov
 
+# CSS styling for the e-mail report
 $cssStyle = @"
 <style>
 body{font-family:Calibri;font-size:12pt;}
@@ -35,14 +39,17 @@ td{border-width: 1px;padding: 5px;border-style: solid;border-color: black}
 </style>
 "@
 
+# Variables for our dates
 $startDate = (Get-Date).AddDays(-$DaysBack)
 $startDateForEmail = Get-Date -Date $startDate -Format MM/dd/yyyy
 $endDate = Get-Date
 
-
+# Get list of AD computers that were joined in between our date ranges specified -- again, this could be removed entirely if we wanted to check on devices returned by Get-MgDevice
 $getComputers = Get-ADComputer -Filter '(whenCreated -gt $startDate) -and (whenCreated -lt $endDate)' -Properties whenCreated
+# Count of how many computers were joined
 $getCount = $getComputers.Count
 
+# If any computers are returned, begin forming our e-mail report
 If ($getCount -gt 0)
 {
     $emailArray = @()
@@ -50,13 +57,16 @@ If ($getCount -gt 0)
 
 Write-Host -ForegroundColor Cyan "Found $($getCount) computers domain-joined in the last $($DaysBack) days. Checking hybrid-joined status..."
 
+# Cycle through every computer object returned from our Get-ADComputer query
 ForEach ($domainPC in $getComputers)
 {
+    # Create and start populating our hybridReport object with data
     $getDate = Get-Date -Date $domainPC.whenCreated -Format "MM/dd/yyyy"
     $exportMe = [hybridReport]::new()
     $exportMe.Workstation = [string]$domainPC.Name
     $exportMe.DateJoined = [string]$getDate    
 
+    # The meat of script -- perform the check to see if it managed
     If ((Get-MgDevice -Search "displayName:$($domainPC.Name)" -ConsistencyLevel eventual).IsManaged -eq $true)
     {        
         Write-Host -ForegroundColor Green "$($domainPC.Name) which was created on $($getDate) is hybrid-joined!"
@@ -68,10 +78,12 @@ ForEach ($domainPC in $getComputers)
         $exportMe.HybridStatus = "Domain"
     }    
 
+    # Add the hybridReport object to an array
     $emailArray += $exportMe
 }
 
-Write-Host -ForegroundColor Cyan "E-mail report to ODE IT Operations Network Team?"
+# E-mail the report if specified
+Write-Host -ForegroundColor Cyan "E-mail report?"
 $yesNo = Read-Host -Prompt "[Y/N]"
 If ($yesNo -eq "y")
 {
