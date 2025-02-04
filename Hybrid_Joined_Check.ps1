@@ -87,7 +87,7 @@ Write-Host -ForegroundColor Cyan "E-mail report?"
 $yesNo = Read-Host -Prompt "[Y/N]"
 If ($yesNo -eq "y")
 {
-    $hybridHeader = "<H2>Workstations Joined to ODE Domain From $($stateDateForEmail)-$($dateForEmail) Hybrid-Joined Status - Count: $($getCount)</H2>"
+    $hybridHeader = "<H2>Workstations Joined to domain From $($stateDateForEmail)-$($dateForEmail) Hybrid-Joined Status - Count: $($getCount)</H2>"
     $generateEmail = $emailArray | ConvertTo-Html -Head $cssStyle -Body $hybridHeader -Title "ODE Hybrid-Joined Report"
     Send-MailMessage -To $emailAddressToSendReportTo -From $emailAddressToSendReportFrom -Subject $emailSubject -BodyAsHtml ($generateEmail | Out-String) -SmtpServer $smtpServerForEmail -WarningAction Ignore
 }
